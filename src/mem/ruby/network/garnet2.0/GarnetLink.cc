@@ -86,6 +86,9 @@ GarnetIntLink *
 GarnetIntLinkParams::create()
 {
     return new GarnetIntLink(this);
+    /// tuvalu
+    // for printing link's src and dst 
+    // print GarnetIntLink(this)
 }
 
 GarnetExtLink::GarnetExtLink(const Params *p)

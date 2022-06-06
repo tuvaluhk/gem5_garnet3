@@ -1,0 +1,151 @@
+diff -r 3d729f86a51f src/mem/ruby/SConscript
+--- a/src/mem/ruby/SConscript	Sun Nov 20 15:42:13 2016 -0500
++++ b/src/mem/ruby/SConscript	Sun Nov 20 16:07:58 2016 -0500
+@@ -43,6 +43,7 @@   
+     Return()
+ 
+ DebugFlag('ProtocolTrace')
++DebugFlag('NetworkTrace')
+ DebugFlag('RubyCache')
+ DebugFlag('RubyCacheTrace')
+ DebugFlag('RubyDma')
+@@ -60,7 +61,7 @@
+ CompoundFlag('Ruby', [ 'RubyQueue', 'RubyNetwork', 'RubyTester',
+     'RubyGenerated', 'RubySlicc', 'RubySystem', 'RubyCache',
+     'RubyDma', 'RubyPort', 'RubySequencer', 'RubyCacheTrace',
+-    'RubyPrefetcher'])
++    'RubyPrefetcher' ])
+ 
+ def do_embed_text(target, source, env):
+     """convert a text file into a file that can be embedded in C
+diff -r 3d729f86a51f src/mem/ruby/network/garnet2.0/GarnetNetwork.cc
+--- a/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc	Sun Nov 20 15:42:13 2016 -0500
++++ b/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc	Sun Nov 20 16:07:58 2016 -0500
+@@ -320,6 +320,12 @@
+ }
+ 
+ void
++GarnetNetwork::magicSend(int ni, int vnet, MsgPtr msg_ptr)
++{
++    m_nis[ni]->magicReceive(vnet, msg_ptr);
++}
++
++void
+ GarnetNetwork::regStats()
+ {
+     Network::regStats();
+diff -r 3d729f86a51f src/mem/ruby/network/garnet2.0/GarnetNetwork.hh
+--- a/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh	Sun Nov 20 15:42:13 2016 -0500
++++ b/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh	Sun Nov 20 16:07:58 2016 -0500
+@@ -38,6 +38,7 @@
+ #include "mem/ruby/network/Network.hh"
+ #include "mem/ruby/network/fault_model/FaultModel.hh"
+ #include "mem/ruby/network/garnet2.0/CommonTypes.hh"
++#include "mem/ruby/slicc_interface/Message.hh"
+ #include "params/GarnetNetwork.hh"
+ 
+ class FaultModel;
+@@ -82,6 +83,8 @@
+     int getNumRouters();
+     int get_router_id(int ni, int vnet);
+ 
++    void magicSend(int ni, int vnet, MsgPtr msg_ptr);
++
+ 
+     // Methods used by Topology to setup the network
+     void makeExtOutLink(SwitchID src, NodeID dest, BasicLink* link,
+diff -r 3d729f86a51f src/mem/ruby/network/garnet2.0/NetworkInterface.cc
+--- a/src/mem/ruby/network/garnet2.0/NetworkInterface.cc	Sun Nov 20 15:42:13 2016 -0500
++++ b/src/mem/ruby/network/garnet2.0/NetworkInterface.cc	Sun Nov 20 16:07:58 2016 -0500
+@@ -36,6 +36,7 @@
+ #include <cmath>
+ 
+ #include "base/cast.hh"
++#include "debug/NetworkTrace.hh"
+ #include "debug/RubyNetwork.hh"
+ #include "mem/ruby/network/MessageBuffer.hh"
+ #include "mem/ruby/network/garnet2.0/Credit.hh"
+@@ -433,22 +434,44 @@
+         // so that the first router increments it to 0
+         route.hops_traversed = -1;
+ 
++        // Stats
+         m_net_ptr->increment_injected_packets(vnet);
+         for (int i = 0; i < num_flits; i++) {
+             m_net_ptr->increment_injected_flits(vnet);
+-            flit *fl = new flit(i, vc, vnet, route, num_flits, new_msg_ptr,
+-                m_net_ptr->MessageSizeType_to_int(
+-                net_msg_ptr->getMessageSize()),
+-                oPort->bitWidth(), curTick());
+-
+-            //fl->set_src_delay(curTick() - ticksToCycles(msg_ptr->getTime()));
+-            fl->set_src_delay(curTick() - msg_ptr->getTime()); // YenHao, BUG!!
+-            niOutVcs[vc].insert(fl);
+         }
+ 
+-        m_ni_out_vcs_enqueue_time[vc] = curTick();
+-        outVcState[vc].setState(ACTIVE_, curTick());
+-    }
++        bool network_trace = true; //false;
++
++        if (network_trace) {
++
++            // Collect Network Trace
++            DPRINTF(NetworkTrace,"%d %d %d %d %d %d %d\n", curTick(),
++                    m_id, m_id, route.dest_ni, route.dest_router,
++                    vnet, num_flits);
++
++            // In trace, network is magical
++            // When replaying the trace through Garnet, the impact of
++            // NoC delay will be visible in the total runtime
++
++            // Magically deliver packet
++            m_net_ptr->magicSend(destID, vnet, new_msg_ptr);
++
++        } else {
++
++            for (int i = 0; i < num_flits; i++) {
++                flit *fl = new flit(i, vc, vnet, route, num_flits, new_msg_ptr,
++                        m_net_ptr->MessageSizeType_to_int(
++                        net_msg_ptr->getMessageSize()),
++                        oPort->bitWidth(), curTick());
++
++                fl->set_src_delay(curCycle() - ticksToCycles(msg_ptr->getTime()));
++                niOutVcs[vc].insert(fl);
++            }
++
++            m_ni_out_vcs_enqueue_time[vc] = curTick();
++            outVcState[vc].setState(ACTIVE_, curTick());
++        }
++        }
+     return true ;
+ }
+ 
+@@ -635,6 +658,16 @@
+ }
+ 
+ void
++NetworkInterface::magicReceive(int vnet, MsgPtr msg_ptr)
++{
++    Tick curTime = clockEdge();
++
++    // enqueue into the protocol buffers
++    outNode_ptr[vnet]->enqueue(
++        msg_ptr, curTime, cyclesToTicks(Cycles(1)));
++}
++
++void
+ NetworkInterface::print(std::ostream& out) const
+ {
+     out << "[Network Interface]";
+diff -r 3d729f86a51f src/mem/ruby/network/garnet2.0/NetworkInterface.hh
+--- a/src/mem/ruby/network/garnet2.0/NetworkInterface.hh	Sun Nov 20 15:42:13 2016 -0500
++++ b/src/mem/ruby/network/garnet2.0/NetworkInterface.hh	Sun Nov 20 16:07:58 2016 -0500
+@@ -67,6 +67,7 @@
+     void addNode(std::vector<MessageBuffer *> &inNode,
+                  std::vector<MessageBuffer *> &outNode);
+ 
++    void magicReceive(int vnet, MsgPtr msg_ptr);
+     void print(std::ostream& out) const;
+     int get_vnet(int vc);
+     void init_net_ptr(GarnetNetwork *net_ptr) { m_net_ptr = net_ptr; }

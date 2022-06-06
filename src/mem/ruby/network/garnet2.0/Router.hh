@@ -106,7 +106,13 @@ class Router : public BasicRouter, public Consumer
     PortDirection getOutportDirection(int outport);
     PortDirection getInportDirection(int inport);
 
-    int route_compute(RouteInfo route, int inport, PortDirection direction);
+    //// Updown Routing with Escape_VC
+    // code begin
+    int route_compute(RouteInfo route, int vc, int inport,
+                      PortDirection direction, bool check_upDn_port);
+    // -------------------------------------------------- //
+    RoutingUnit* get_routingUnit_ref() { return &routingUnit; }
+    // code end
     void grant_switch(int inport, flit *t_flit);
     void schedule_wakeup(Cycles time);
 

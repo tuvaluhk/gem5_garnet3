@@ -37,7 +37,12 @@
 
 #include "mem/ruby/common/Consumer.hh"
 #include "mem/ruby/network/garnet2.0/CommonTypes.hh"
+//// Updown Routing with Escape_VC
+// code begin
+#include "mem/ruby/network/garnet2.0/flit.hh"
 
+class flit;
+// code end
 class Router;
 class InputUnit;
 class OutputUnit;
@@ -54,8 +59,12 @@ class SwitchAllocator : public Consumer
     void print(std::ostream& out) const {};
     void arbitrate_inports();
     void arbitrate_outports();
-    bool send_allowed(int inport, int invc, int outport, int outvc);
-    int vc_allocate(int outport, int inport, int invc);
+    //// Updown Routing with Escape_VC
+    // code begin
+    bool send_allowed(int inport, int invc, int outport, int outvc,
+                        flit *t_flit);
+    int vc_allocate(int outport, int inport, int invc, flit *t_flit);
+    // code end
 
     inline double
     get_input_arbiter_activity()

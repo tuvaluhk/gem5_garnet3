@@ -1,0 +1,3 @@
+sim_seconds = 0.000002
+average_packet_latency = 1640.794039
+flits_received = 30263

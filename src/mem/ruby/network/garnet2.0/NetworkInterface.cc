@@ -432,6 +432,13 @@ NetworkInterface::flitisizeMessage(MsgPtr msg_ptr, int vnet)
         // initialize hops_traversed to -1
         // so that the first router increments it to 0
         route.hops_traversed = -1;
+        //// Updown Routing with Escape_VC
+        // code begin
+        // intialize 'new_src' to -1.
+        // this is populated once flit/packet enters the escapeVC
+        // and then should not be changed afterwords
+        route.new_src = -1;
+        // code end        
 
         m_net_ptr->increment_injected_packets(vnet);
         for (int i = 0; i < num_flits; i++) {

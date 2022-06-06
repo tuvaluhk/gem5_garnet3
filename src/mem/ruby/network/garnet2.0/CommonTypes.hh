@@ -34,15 +34,19 @@
 #include "mem/ruby/common/NetDest.hh"
 
 // All common enums and typedefs go here
-
 enum flit_type {HEAD_, BODY_, TAIL_, HEAD_TAIL_,
                 CREDIT_, NUM_FLIT_TYPE_};
 enum VC_state_type {IDLE_, VC_AB_, ACTIVE_, NUM_VC_STATE_TYPE_};
 enum VNET_type {CTRL_VNET_, DATA_VNET_, NULL_VNET_, NUM_VNET_TYPE_};
 enum flit_stage {I_, VA_, SA_, ST_, LT_, NUM_FLIT_STAGE_};
 enum link_type { EXT_IN_, EXT_OUT_, INT_, NUM_LINK_TYPES_ };
-enum RoutingAlgorithm { TABLE_ = 0, XY_ = 1, CUSTOM_ = 2,
+/// updown routing
+enum RoutingAlgorithm { TABLE_ = 0, XY_ = 1, UPDN_ = 2, CUSTOM_ = 3,
                         NUM_ROUTING_ALGORITHM_};
+/// end
+/// stoi function
+enum status {invalid,valid};
+/// end
 enum bridge_type {FROM_LINK_, TO_LINK_, NUM_CDC_TYPE_};
 
 struct RouteInfo
@@ -62,6 +66,9 @@ struct RouteInfo
     int dest_ni;
     int dest_router;
     int hops_traversed;
+    /// Escape VC
+    int new_src;
+    /// end
 };
 
 #define INFINITE_ 10000

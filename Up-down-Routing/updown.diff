@@ -1,0 +1,478 @@
+diff --git a/src/mem/ruby/network/garnet2.0/CommonTypes.hh b/src/mem/ruby/network/garnet2.0/CommonTypes.hh
+index 2b02ae9..93879f3 100644
+--- a/src/mem/ruby/network/garnet2.0/CommonTypes.hh
++++ b/src/mem/ruby/network/garnet2.0/CommonTypes.hh
+@@ -40,8 +40,10 @@ enum VC_state_type {IDLE_, VC_AB_, ACTIVE_, NUM_VC_STATE_TYPE_};
+ enum VNET_type {CTRL_VNET_, DATA_VNET_, NULL_VNET_, NUM_VNET_TYPE_};
+ enum flit_stage {I_, VA_, SA_, ST_, LT_, NUM_FLIT_STAGE_};
+ enum link_type { EXT_IN_, EXT_OUT_, INT_, NUM_LINK_TYPES_ };
+-enum RoutingAlgorithm { TABLE_ = 0, XY_ = 1, CUSTOM_ = 2,
++/// updown routing
++enum RoutingAlgorithm { TABLE_ = 0, XY_ = 1, UPDN_ = 2, CUSTOM_ = 3,
+                         NUM_ROUTING_ALGORITHM_};
++/// end
+ enum bridge_type {FROM_LINK_, TO_LINK_, NUM_CDC_TYPE_};
+ 
+ struct RouteInfo
+diff --git a/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc b/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc
+index b2c8267..b7d17a9 100644
+--- a/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc
++++ b/src/mem/ruby/network/garnet2.0/GarnetNetwork.cc
+@@ -33,6 +33,7 @@
+ 
+ #include <cassert>
+ 
++#include <fstream>
+ #include "base/cast.hh"
+ #include "debug/RubyNetwork.hh"
+ #include "mem/ruby/common/NetDest.hh"
+@@ -62,6 +63,11 @@ GarnetNetwork::GarnetNetwork(const Params *p)
+     m_buffers_per_data_vc = p->buffers_per_data_vc;
+     m_buffers_per_ctrl_vc = p->buffers_per_ctrl_vc;
+     m_routing_algorithm = p->routing_algorithm;
++    /// updown routing
++    conf_file = p->conf_file;
++    cout << "Configuration file to read from: "\
++        << conf_file << endl;
++    /// end
+ 
+     m_enable_fault_model = p->enable_fault_model;
+     if (m_enable_fault_model)
+@@ -93,8 +99,241 @@ GarnetNetwork::GarnetNetwork(const Params *p)
+         m_nis.push_back(ni);
+         ni->init_net_ptr(this);
+     }
++    
++    /// updown routing
++    // resize the routingTable
++    routingTable.resize(m_routers.size());
++    configure_network();
++    /// end
+ }
+ 
++
++/// updown routing
++/// code begin
++
++// populate_routingTable() called by configure_network(),
++// input path_, get entry_, and push entry_ to the end of routingTable.
++void
++GarnetNetwork::populate_routingTable\
++(std::vector< int >& path_, int ylen) {
++    // original 'src' and 'dst' pair for this path
++    // get the reference of the last, first unit in vector
++    int dst = path_.back();
++    int src = path_.front();
++    entry entry_;
++    for (int curr_ = 0, nxt_ = curr_ + 1;
++        curr_ < path_.size() && nxt_ < path_.size();
++        curr_++, nxt_++) {
++        string dirn_;
++        if (path_[nxt_] == (path_[curr_] - 1)) {
++            // West
++            // set outport direction according to path_[nxt_]
++            entry_ = {path_[nxt_], "West"};
++        }
++        else if (path_[nxt_] == (path_[curr_] + 1)) {
++            // East
++            entry_ = {path_[nxt_], "East"};
++        }
++        else if (path_[nxt_] == (path_[curr_] + ylen)) {
++            // North
++            entry_ = {path_[nxt_], "North"};
++        }
++        else if (path_[nxt_] == (path_[curr_] - ylen)) {
++            // South
++            entry_ = {path_[nxt_], "South"};
++        }
++        else if (path_[nxt_] == path_[curr_]) {
++            // skip do nothing...
++        }
++        else {
++            cout << " this is not possible" << endl;
++            assert(0);
++        }
++
++        // push entry_ to the end of routingTable
++        // routingTable[src][dst] including lots of step from src to dst,
++        // each step/entry_ contains next node number and direction.
++        // entry_ = {path_[nxt_], "West"}
++        routingTable[src][dst].push_back(entry_);
++    }
++
++    return;
++}
++
++/// end
++
++/// updown routing
++// code begin
++
++void
++GarnetNetwork::configure_network()
++{
++    // open the file pointed by conf_file for read
++    ifstream inFile(conf_file);
++
++    string word;
++    // read xlen, ylen
++    inFile >> word;
++    int xlen = stoi(word);
++    inFile >> word;
++    int ylen = stoi(word);
++
++    assert(m_num_rows == xlen);
++    assert(m_routers.size() == xlen*ylen);
++
++    // resize the table
++    routingTable.resize(xlen*ylen);
++    for (int i = 0; i < xlen*ylen; ++i) {
++        routingTable[i].resize(xlen*ylen);
++    }
++
++    bool top_ = false;
++    bool spinRing = false;
++    bool up_dn = false;
++    bool up_dn_path = false;
++    bool path_start = false;
++    bool path_end = false;
++    std::vector<int> tmp_path;
++
++    while (!(inFile.eof())) {
++        // eof, end of file
++        inFile >> word;
++
++        if ((word.find("Topology") != -1)) {
++            // find "Topology" in word
++            top_ = true;
++            spinRing = false;
++            up_dn = false;
++            up_dn_path = false;
++        }
++        if ((word.find("SpinRing") != -1)) {
++            top_ = false;
++            spinRing = true;
++            up_dn = false;
++            up_dn_path = false;
++        }
++        if ((word.find("UP/DOWN") != -1)) {
++            top_ = false;
++            spinRing = false;
++            up_dn = true;
++            up_dn_path = false;
++        }
++        if ((word.find("UP/DOWN_PATHS") != -1)) {
++            top_ = false;
++            spinRing = false;
++            up_dn = false;
++            up_dn_path = true;
++        }
++
++        //// skip to UP/DOWN_PATHS,
++        // and read up_dn_path to temp_path
++        if ( up_dn_path ) {
++
++            if (inFile.peek() == EOF) {
++                // if end of file, then path_end
++                path_start = false;
++                path_end = true;
++            }
++            if ((!path_start) &&
++               (path_end) &&
++               (tmp_path.size()>0)) {
++                // if path_end but temp_path exit
++                populate_routingTable(tmp_path, ylen);
++                // change dst node to outport dirn, and push into routingTable
++                tmp_path.clear();
++            }
++            if (word =="[") {
++                // path_end
++                path_start = false;
++                path_end = true;
++            }
++            if (path_start &&
++                !path_end) {
++                // cout << stoi(word);
++                tmp_path.push_back(stoi(word));
++            }
++            if (word == ":") {
++                // path_start
++                path_start = true;
++                path_end = false;
++            }
++            assert(!top_);
++            assert(!up_dn);
++            assert(!spinRing);
++        }
++
++    }
++
++    // from the beginning of the file
++    inFile.clear();
++    inFile.seekg(0, std::ios::beg);
++
++    string line;
++    int src = 0;
++    int dst = 0;
++    bool start = false;
++    bool stop = false;
++
++    //// skip to UP/DOWN
++    // read up_dn to global_upDn
++    while (std::getline(inFile, line)) {
++        if ( start &&
++            line.empty()) {
++            // UP/DOWN end
++            start = false;
++            stop = true;
++        }
++        if ( start &&
++            !stop ) {
++            // cout << line << endl;
++            // break this line into deliminter,
++            // for example, deliminter in "a b" is " "
++            for (auto x : line) {
++                if (x == 'u') {
++                    // if links is Up
++                    // cout << x << endl;
++                    pair<upDn_, char> p((upDn_{src,dst}),x);
++                    // record src, dst, and x(u or d)
++                    global_upDn.insert(p);
++                    // insert into global_upDn
++                }
++                if (x == 'd') {
++                    // cout << x << endl;
++                    pair<upDn_, char> p((upDn_{src,dst}),x);
++                    global_upDn.insert(p);
++                }
++                if (x == ' ') {
++                    // do not increment dst here here
++                } else {
++                    dst += 1;
++                }
++            }
++            // first from src 0 to dst 0,1,2,3,..., then,1,2,...
++            dst = 0;	// reset
++            src += 1;	// increment
++            // cout.flush();
++        }
++        if ((line.find("UP/DOWN") != -1)) {
++            // find "UP/DOWN"
++            // cout << line << endl;
++            // cout.flush();
++            start = true;
++        }
++    }
++
++    // close the file.
++    inFile.close();
++    // cout global--map
++    /*for (auto& t : global_upDn)
++        std::cout << t.first.src << " "
++                  << t.first.dst << " "
++                  << t.second << " "
++                  << "\n";*/
++    // assert(0);
++}
++
++/// end
++
+ void
+ GarnetNetwork::init()
+ {
+diff --git a/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh b/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh
+index bb4b24a..49a195f 100644
+--- a/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh
++++ b/src/mem/ruby/network/garnet2.0/GarnetNetwork.hh
+@@ -33,6 +33,7 @@
+ #define __MEM_RUBY_NETWORK_GARNET2_0_GARNETNETWORK_HH__
+ 
+ #include <iostream>
++#include <map>
+ #include <vector>
+ 
+ #include "mem/ruby/network/Network.hh"
+@@ -47,6 +48,11 @@ class NetDest;
+ class NetworkLink;
+ class CreditLink;
+ 
++//// Updown Routing
++// code begin
++using namespace std;
++// code end
++
+ class GarnetNetwork : public Network
+ {
+   public:
+@@ -58,6 +64,19 @@ class GarnetNetwork : public Network
+ 
+     // Configuration (set externally)
+ 
++
++    /// updown routing
++    void populate_routingTable(\
++                       std::vector<int>& path_, int ylen);
++
++    void configure_network();
++
++    char get_direction(int src, int dst) {
++        upDn_ tmp(src, dst);
++        return (global_upDn.at(tmp));
++    }
++    /// end
++    
+     // for 2D topology
+     int getNumRows() const { return m_num_rows; }
+     int getNumCols() { return m_num_cols; }
+@@ -139,6 +158,44 @@ class GarnetNetwork : public Network
+     {
+         m_total_hops += hops;
+     }
++    
++   /// updown routing
++   std::string conf_file;
++   struct entry {
++    int next_router_id;
++    std::string direction_;
++    entry() :
++        next_router_id(-1),
++        direction_("Unknown")
++    {}
++    entry(int id, std::string dirn) :
++            next_router_id(id),
++            direction_(dirn)
++    {}
++    };
++
++    struct upDn_ {
++        int src;
++        int dst;
++
++        bool operator==(const upDn_ &pair_) const {
++            return (src == pair_.src && dst == pair_.dst);
++        }
++
++        bool operator<(const upDn_ &pair_)  const {
++            return ((src < pair_.src) ||
++                    (src == pair_.src && dst < pair_.dst));
++        }
++
++        upDn_(int src_, int dst_) :
++            src(src_), dst(dst_)
++        {}
++    };
++
++    std::vector<std::vector<std::vector< entry > > > routingTable;
++
++    std::map<upDn_, char> global_upDn;
++   /// end
+ 
+   protected:
+     // Configuration
+diff --git a/src/mem/ruby/network/garnet2.0/GarnetNetwork.py b/src/mem/ruby/network/garnet2.0/GarnetNetwork.py
+index 012ab60..da221a9 100644
+--- a/src/mem/ruby/network/garnet2.0/GarnetNetwork.py
++++ b/src/mem/ruby/network/garnet2.0/GarnetNetwork.py
+@@ -42,12 +42,17 @@ class GarnetNetwork(RubyNetwork):
+     vcs_per_vnet = Param.UInt32(4, "virtual channels per virtual network");
+     buffers_per_data_vc = Param.UInt32(4, "buffers per data virtual channel");
+     buffers_per_ctrl_vc = Param.UInt32(1, "buffers per ctrl virtual channel");
++    ### updown routing
+     routing_algorithm = Param.Int(0,
+-        "0: Weight-based Table, 1: XY, 2: Custom");
++        "0: Weight-based Table, 1: XY, 2: Updown, 3: Custom");
++    ### end
+     enable_fault_model = Param.Bool(False, "enable network fault model");
+     fault_model = Param.FaultModel(NULL, "network fault model");
+     garnet_deadlock_threshold = Param.UInt32(50000,
+                               "network-level deadlock threshold")
++    ### updown routing
++    conf_file = Param.String("up-down routing configuration file")
++    ### end  
+ 
+ class GarnetNetworkInterface(ClockedObject):
+     type = 'GarnetNetworkInterface'
+diff --git a/src/mem/ruby/network/garnet2.0/RoutingUnit.cc b/src/mem/ruby/network/garnet2.0/RoutingUnit.cc
+index 1d23b1d..532097a 100644
+--- a/src/mem/ruby/network/garnet2.0/RoutingUnit.cc
++++ b/src/mem/ruby/network/garnet2.0/RoutingUnit.cc
+@@ -180,6 +180,10 @@ RoutingUnit::outportCompute(RouteInfo route, int inport,
+             lookupRoutingTable(route.vnet, route.net_dest); break;
+         case XY_:     outport =
+             outportComputeXY(route, inport, inport_dirn); break;
++        /// updown routing
++        case UPDN_:     outport =
++            outportComputeUPDN(route, inport, inport_dirn); break;     
++        /// end        
+         // any custom algorithm
+         case CUSTOM_: outport =
+             outportComputeCustom(route, inport, inport_dirn); break;
+@@ -250,6 +254,50 @@ RoutingUnit::outportComputeXY(RouteInfo route,
+     return m_outports_dirn2idx[outport_dirn];
+ }
+ 
++//// Updown Routing: Implement of Updown Routing
++// code begin
++int
++RoutingUnit::outportComputeUPDN(RouteInfo route,
++                    int inport,
++                    PortDirection inport_dirn)
++{
++    PortDirection outport_dirn = "Unknown";
++
++    // get curr_id, dest_id and stc_id
++    int curr_id = m_router->get_id();
++    int src_id = route.src_router;
++    int dest_id = route.dest_router;
++
++    // if current id is the source id
++    if (curr_id == src_id) {
++        // this means that it's the beginning
++        outport_dirn = m_router->get_net_ptr()->\
++            routingTable[src_id][dest_id][0].direction_;
++    } else {
++        // for cycle until match the target index:
++        for (int indx= 0; indx < m_router->get_net_ptr()->\
++            routingTable[src_id][dest_id].size(); indx++) {
++            // choose next port from routingTable
++            if (m_router->get_net_ptr()->\
++                routingTable[src_id][dest_id][indx].\
++                next_router_id == curr_id) {
++                outport_dirn = m_router->get_net_ptr()->\
++                    routingTable[src_id][dest_id][indx+1].direction_;
++                break;
++            }
++        }
++    }
++
++    assert(outport_dirn != "Unknown");
++    //cout << "curr_id: " << curr_id << endl;
++    //cout << "dest_id: " << dest_id << endl;
++    //cout << "outport_dirn: " << outport_dirn << endl;
++    /*cout << "m_outports_dirn2idx[outport_dirn]: " \
++    << m_outports_dirn2idx[outport_dirn] << endl;*/
++    return m_outports_dirn2idx[outport_dirn];
++}
++// code end
++
+ // Template for implementing custom routing algorithm
+ // using port directions. (Example adaptive)
+ int
+diff --git a/src/mem/ruby/network/garnet2.0/RoutingUnit.hh b/src/mem/ruby/network/garnet2.0/RoutingUnit.hh
+index 3f1f401..f31c432 100644
+--- a/src/mem/ruby/network/garnet2.0/RoutingUnit.hh
++++ b/src/mem/ruby/network/garnet2.0/RoutingUnit.hh
+@@ -63,6 +63,13 @@ class RoutingUnit
+     int outportComputeXY(RouteInfo route,
+                          int inport,
+                          PortDirection inport_dirn);
++                         
++    //// Updown Routing: Declare routing function
++    // code begin
++    int outportComputeUPDN(RouteInfo route,
++                         int inport,
++                         PortDirection inport_dirn);
++    // code end                         
+ 
+     // Custom Routing Algorithm using Port Directions
+     int outportComputeCustom(RouteInfo route,

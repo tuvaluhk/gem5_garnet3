@@ -151,11 +151,16 @@ Router::getInportDirection(int inport)
     return m_input_unit[inport]->get_direction();
 }
 
+//// Updown Routing with Escape_VC
+// code begin
 int
-Router::route_compute(RouteInfo route, int inport, PortDirection inport_dirn)
+Router::route_compute(RouteInfo route, int vc, int inport,
+                  PortDirection direction, bool check_upDn_port)
 {
-    return routingUnit.outportCompute(route, inport, inport_dirn);
+    return routingUnit.outportCompute(route, vc, inport,
+                                    direction, check_upDn_port);
 }
+// end
 
 void
 Router::grant_switch(int inport, flit *t_flit)

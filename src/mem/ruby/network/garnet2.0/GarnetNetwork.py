@@ -42,12 +42,21 @@ class GarnetNetwork(RubyNetwork):
     vcs_per_vnet = Param.UInt32(4, "virtual channels per virtual network");
     buffers_per_data_vc = Param.UInt32(4, "buffers per data virtual channel");
     buffers_per_ctrl_vc = Param.UInt32(1, "buffers per ctrl virtual channel");
+    ### updown routing
     routing_algorithm = Param.Int(0,
-        "0: Weight-based Table, 1: XY, 2: Custom");
+        "0: Weight-based Table, 1: XY, 2: Updown, 3: Custom");
+    ### end
     enable_fault_model = Param.Bool(False, "enable network fault model");
     fault_model = Param.FaultModel(NULL, "network fault model");
     garnet_deadlock_threshold = Param.UInt32(50000,
                               "network-level deadlock threshold")
+    ### updown routing
+    conf_file = Param.String("up-down routing configuration file")
+    ### end  
+    
+    ### Escape VC
+    escape_vc = Param.UInt32(0, "if set to 1 then enable escapeVC")
+    ### end
 
 class GarnetNetworkInterface(ClockedObject):
     type = 'GarnetNetworkInterface'

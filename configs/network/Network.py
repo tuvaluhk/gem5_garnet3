@@ -58,15 +58,33 @@ def define_options(parser):
     parser.add_option("--link-width-bits", action="store", type="int",
                       default=128,
                       help="width in bits for all links inside garnet.")
+                      
+    ### dsent .cfg parser
+    parser.add_option("--buffers-per-data-vc", action="store", type="int", default=4,
+                      help="""number of buffers per data virtual channel.""")
+    parser.add_option("--buffers-per-ctrl-vc", action="store", type="int", default=1,
+                      help="""number of buffers per control virtual channel.""")      
+    ### desent end 
+                   
     parser.add_option("--vcs-per-vnet", action="store", type="int", default=4,
                       help="""number of virtual channels per virtual network
                             inside garnet network.""")
+    ### updown routing
     parser.add_option("--routing-algorithm", action="store", type="int",
                       default=0,
                       help="""routing algorithm in network.
                             0: weight-based table
                             1: XY (for Mesh. see garnet2.0/RoutingUnit.cc)
-                            2: Custom (see garnet2.0/RoutingUnit.cc""")
+                            2: Updown (see garnet2.0/RoutingUnit.cc)
+                            3: Custom (see garnet2.0/RoutingUnit.cc""")
+    ### end
+    
+    ### Esacape VC
+    parser.add_option("--escape-vc", action="store", type="int", default=0,
+                      help="""if set 1 will enable up-dn routing present in the
+                            configuration file passed as the commandline
+                            argument only in escape VC, all other would be
+                            random""")
     parser.add_option("--network-fault-model", action="store_true",
                       default=False,
                       help="""enable network fault model:
@@ -74,6 +92,10 @@ def define_options(parser):
     parser.add_option("--garnet-deadlock-threshold", action="store",
                       type="int", default=50000,
                       help="network-level deadlock threshold.")
+    ### updownrouting                  
+    parser.add_option("--conf-file", type="string",
+                      default="NoI_BD.txt", help="check configs/topologies for complete configuration")
+    ### end
 
 def create_network(options, ruby):
 
@@ -106,8 +128,14 @@ def init_network(options, network, InterfaceClass):
         network.vcs_per_vnet = options.vcs_per_vnet
         network.ni_flit_size = options.link_width_bits / 8
         network.routing_algorithm = options.routing_algorithm
+        ### Escape VC
+        network.escape_vc = options.escape_vc
+        ### end 
         network.garnet_deadlock_threshold = options.garnet_deadlock_threshold
-
+        ### updownrouting  
+        network.conf_file = options.conf_file
+        ### end          
+        
         # Create CDC and connect them to the corresponding links
         for intLink in network.int_links:
             intLink.src_net_bridge = NetworkBridge(

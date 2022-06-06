@@ -1,0 +1,104 @@
+           
+Run: Stats:
+sim_ticks                                       20313                       # Number of ticks simulated
+system.ruby.network.average_packet_latency  7575.750000                      
+system.ruby.network.average_hops             2.727410                      
+system.ruby.network.packets_injected::total         1702                      
+system.ruby.network.packets_received::total          440                      
+Run: Stats:
+sim_ticks                                       20313                       # Number of ticks simulated
+system.ruby.network.average_packet_latency  7575.750000                      
+system.ruby.network.average_hops             2.727410                      
+system.ruby.network.packets_injected::total         1702                      
+system.ruby.network.packets_received::total          440                      
+Run: Stats:
+sim_ticks                                       20313                       # Number of ticks simulated
+system.ruby.network.average_packet_latency  7575.750000                      
+system.ruby.network.average_hops             2.727410                      
+system.ruby.network.packets_injected::total         1702                      
+system.ruby.network.packets_received::total          440                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency         9000                      
+system.ruby.network.average_hops                    4                      
+system.ruby.network.packets_injected::total            3                      
+system.ruby.network.packets_received::total            1                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency         9000                      
+system.ruby.network.average_hops                    4                      
+system.ruby.network.packets_injected::total            3                      
+system.ruby.network.packets_received::total            1                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency         9000                      
+system.ruby.network.average_hops                    4                      
+system.ruby.network.packets_injected::total            3                      
+system.ruby.network.packets_received::total            1                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency         9000                      
+system.ruby.network.average_hops                    4                      
+system.ruby.network.packets_injected::total            3                      
+system.ruby.network.packets_received::total            1                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency  8204.697987                      
+system.ruby.network.average_hops             3.208054                      
+system.ruby.network.packets_injected::total          265                      
+system.ruby.network.packets_received::total          149                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency   192.381625                      
+system.ruby.network.average_hops             3.295613                      
+system.ruby.network.packets_injected::total         5222                      
+system.ruby.network.packets_received::total         4604                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency    79.666537                      
+system.ruby.network.average_hops             3.355304                      
+system.ruby.network.packets_injected::total         2571                      
+system.ruby.network.packets_received::total         2564                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency    78.629095                      
+system.ruby.network.average_hops             3.355304                      
+system.ruby.network.packets_injected::total         2571                      
+system.ruby.network.packets_received::total         2564                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency    84.967766                      
+system.ruby.network.average_hops             3.341043                      
+system.ruby.network.packets_injected::total        20391                      
+system.ruby.network.packets_received::total        20320                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency   202.566859                      
+system.ruby.network.average_hops             3.341255                      
+system.ruby.network.packets_injected::total        26743                      
+system.ruby.network.packets_received::total        26511                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency   542.566819                      
+system.ruby.network.average_hops             3.329978                      
+system.ruby.network.packets_injected::total        26037                      
+system.ruby.network.packets_received::total        25629                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency   322.229291                      
+system.ruby.network.average_hops             3.322643                      
+system.ruby.network.packets_injected::total         8326                      
+system.ruby.network.packets_received::total         7702                      
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency   104.862556                      
+system.ruby.network.average_hops             3.344896                      
+system.ruby.network.packets_injected::total        25450                      
+system.ruby.network.packets_received::total        25283                      
+Run: Stats:
+Run: Stats:
+Run: Stats:
+sim_ticks                                       20000                       # Number of ticks simulated
+system.ruby.network.average_packet_latency          nan                      
+system.ruby.network.average_hops                  nan                      
+system.ruby.network.packets_injected::total        30723                      

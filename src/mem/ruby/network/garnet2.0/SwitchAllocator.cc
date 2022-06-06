@@ -122,8 +122,12 @@ SwitchAllocator::arbitrate_inports()
 
                 // check if the flit in this InputVC is allowed to be sent
                 // send_allowed conditions described in that function.
+                //// Updown Routing with Escape_VC
+                // code begin
+                flit *t_flit = input_unit->peekTopFlit(invc);                
                 bool make_request =
-                    send_allowed(inport, invc, outport, outvc);
+                     send_allowed(inport, invc, outport, outvc, t_flit);
+                // code end
 
                 if (make_request) {
                     m_input_arbiter_activity++;
@@ -178,7 +182,11 @@ SwitchAllocator::arbitrate_outports()
                 int outvc = input_unit->get_outvc(invc);
                 if (outvc == -1) {
                     // VC Allocation - select any free VC from outport
-                    outvc = vc_allocate(outport, inport, invc);
+                    //// Updown Routing with Escape_VC
+                    // code begin
+                    flit *t_flit = input_unit->peekTopFlit(invc);
+                    outvc = vc_allocate(outport, inport, invc, t_flit);
+                    // code end
                 }
 
                 // remove flit from Input VC
@@ -276,8 +284,12 @@ SwitchAllocator::arbitrate_outports()
  *     that arrived before this flit and is requesting the same output port.
  */
 
+//// Updown Routing with Escape_VC
+// code begin
 bool
-SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc)
+SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc,
+                                flit *t_flit)
+// code end
 {
     // Check if outvc needed
     // Check if credit needed (for multi-flit packet)
@@ -293,7 +305,10 @@ SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc)
         // needs outvc
         // this is only true for HEAD and HEAD_TAIL flits.
 
-        if (output_unit->has_free_vc(vnet)) {
+        //// Updown Routing with Escape_VC
+        // code begin
+        if (output_unit->has_free_vc(vnet, invc, t_flit, inport)) {
+        // code end
 
             has_outvc = true;
 
@@ -335,11 +350,16 @@ SwitchAllocator::send_allowed(int inport, int invc, int outport, int outvc)
 
 // Assign a free VC to the winner of the output port.
 int
-SwitchAllocator::vc_allocate(int outport, int inport, int invc)
+SwitchAllocator::vc_allocate(int outport, int inport, int invc, flit* t_flit)
+// code end
 {
     // Select a free VC from the output port
+    //// Updown Routing with Escape_VC
+    // code begin    
     int outvc =
-        m_router->getOutputUnit(outport)->select_free_vc(get_vnet(invc));
+        m_router->getOutputUnit(outport)->select_free_vc(get_vnet(invc),
+                                                        invc, t_flit, inport);
+    // code end
 
     // has to get a valid VC since it checked before performing SA
     assert(outvc != -1);

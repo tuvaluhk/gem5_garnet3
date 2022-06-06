@@ -87,9 +87,10 @@ InputUnit::wakeup()
             set_vc_active(vc, curTick());
 
             // Route computation for this vc
+            /// Escape vc
             int outport = m_router->route_compute(t_flit->get_route(),
-                m_id, m_direction);
-
+                vc, m_id, m_direction, false);
+            /// end
             // Update output port in VC
             // All flits in this packet will use this output port
             // The output port field in the flit is updated after it wins SA

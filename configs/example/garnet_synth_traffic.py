@@ -35,6 +35,7 @@ from m5.defines import buildEnv
 from m5.util import addToPath
 import os, optparse, sys
 
+
 addToPath('../')
 
 from common import Options

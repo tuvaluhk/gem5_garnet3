@@ -56,6 +56,7 @@ class NoI_CMesh(SimpleTopology):
         nodes = self.nodes
 
         num_noc_routers = options.num_cpus
+        num_dirs = options.num_dirs
         num_rows = options.mesh_rows
         num_chiplets = options.num_chiplets # by YenHao
         cpus_per_chiplet, remainder = divmod(options.num_cpus,
@@ -90,7 +91,7 @@ class NoI_CMesh(SimpleTopology):
         #assert(remainder == 4 or num_noc_routers == 4) # by YenHao
         assert(divisible(num_columns, num_chiplet_columns)) # True if divisible
         num_noi_rows = int((num_rows+1)/2)
-        num_noi_columns = int((num_columns+1)/2)
+        num_noi_columns = int((num_columns+1)/2) + 1
         num_noi_routers = num_noi_rows * num_noi_columns # CMesh NoI topology
         print('#NoC_routers:', num_noc_routers,
                 '   #NoI_routers:', num_noi_routers)
@@ -107,37 +108,58 @@ class NoI_CMesh(SimpleTopology):
         # link counter to set unique link ids
         link_count = 0
 
-        # The remainder_nodes are Dir nodes as the memory controller node
-        network_nodes = []
+        # First determine which nodes are cache cntrls vs. dirs vs. remainders
+        l1_nodes = []
+        dir_nodes = []
         remainder_nodes = []
-        for node_index in range(len(nodes)):
+        for node in nodes:
             #if node_index < num_noc_routers:
-            if node_index < (len(nodes) - remainder):
-                network_nodes.append(nodes[node_index])
+            if node.type == 'L1Cache_Controller':
+                l1_nodes.append(node)  
+            elif node.type == 'Directory_Controller':
+                dir_nodes.append(node)  
             else:
-                remainder_nodes.append(nodes[node_index])
+                remainder_nodes.append(node)
 
         # Connect each external node to the appropriate router
         ext_l1cache_links = []
         ext_dir_links = []
-        for (i, n) in enumerate(network_nodes):
-            if (n.type == 'L1Cache_Controller'):
-                cntrl_level, router_id = divmod(i, num_noc_routers)
-                assert(cntrl_level < cntrls_per_router)
-                ext_l1cache_links.append(ExtLink(link_id=link_count,
-                                        ext_node=n,
-                                        int_node=noc_routers[router_id],
-                                        latency = link_latency))
-            elif (n.type == 'Directory_Controller'):
-                #assert(False or num_noc_routers == 4)
-                cntrl_level, router_id = divmod(i, num_noc_routers)
-                assert(cntrl_level < cntrls_per_router)
-                ext_dir_links.append(ExtLink(link_id=link_count,
-                                        ext_node=n,
-                                        int_node=noc_routers[router_id],
-                                        latency = link_latency))
-            else:
-                assert(False)
+        print("\n\nL1Cache-NoC-Router:")
+        for (i, n) in enumerate(l1_nodes):
+            cntrl_level, router_id = divmod(i, num_noc_routers)
+            assert(cntrl_level < cntrls_per_router)
+            ext_l1cache_links.append(ExtLink(link_id=link_count,
+                                     ext_node=n,
+                                     int_node=noc_routers[router_id],
+                                     latency = link_latency))
+            
+              
+            print_connection("L1Cache_Controller", n.version, "NoC-Router", router_id, link_count,\
+                              link_latency, 512)
+                              
+            link_count += 1
+        
+        ### Left to be Done
+        #for (i, n) in enumerate(dir_nodes[:len(dir_nodes)/2]):
+        print("\n\nDir-NoI-Router:")                          
+        for (i, n) in enumerate(dir_nodes):
+            ## Left-Side Directory Controller
+            if(0<=i<8):
+                router_id = int(i/2)*num_noi_columns
+                print(router_id)
+            ## Right-Side Directory Controller
+            elif(8<=i<16):
+                router_id = int(i/2)*num_noi_columns - 16
+                print(router_id)
+            ext_dir_links.append(ExtLink(link_id=link_count,
+                                    ext_node=n,
+                                    int_node=noi_routers[router_id],
+                                    latency = link_latency))
+                                                                      
+                                        
+            print_connection("Dir_Controller", n.version, "Router", router_id, link_count,\
+                                  link_latency, 512)
+                                  
             link_count += 1
 
         # Connect the 4 remainding nodes to corners.  These should only be
@@ -172,7 +194,9 @@ class NoI_CMesh(SimpleTopology):
 
         # Connect network-on-chip (NoC) internal routers
         int_noc_links = []
-
+        print("\n\nLink in the 4-chiplet NoC:")
+	
+        print("\n\nEast-West:")
         # East output to West input links (weight = 1)
         for row in range(num_rows):
             for col in range(num_columns):
@@ -187,14 +211,21 @@ class NoI_CMesh(SimpleTopology):
                                              dst_inport="West",
                                              latency = link_latency,
                                              weight=1))
+                    
+                    print_connection("Router", get_router_id(noc_routers[east_out]),
+                                     "Router", get_router_id(noc_routers[west_in]),
+                                     link_count, link_latency, 512)
+                                     
                     link_count += 1
+                    
+        print("\n\nWest-East:")
         # West output to East input links (weight = 1)
         for row in range(num_rows):
-            for col in range(num_columns):
-                if (col + 1 < num_columns
-                                and not divisible(col+1, num_chiplet_columns)):
-                    east_in = col + (row * num_columns)
-                    west_out = (col + 1) + (row * num_columns)
+            for col in range(num_columns-1,0,-1):
+                if (col - 1 >= 0 
+                                and not divisible(col, num_chiplet_columns)):
+                    west_out = col + (row * num_columns)
+                    east_in = (col - 1) + (row * num_columns)
                     int_noc_links.append(IntLink(link_id=link_count,
                                              src_node=noc_routers[west_out],
                                              dst_node=noc_routers[east_in],
@@ -202,7 +233,14 @@ class NoI_CMesh(SimpleTopology):
                                              dst_inport="East",
                                              latency = link_latency,
                                              weight=1))
+                    
+                    print_connection("Router", get_router_id(noc_routers[west_out]),
+                                     "Router", get_router_id(noc_routers[east_in]),
+                                     link_count, link_latency, 512)
+                                                                                  
                     link_count += 1
+                    
+        print("\n\nNorth-South:")
         # North output to South input links (weight = 2)
         for col in range(num_columns):
             for row in range(num_rows):
@@ -217,14 +255,21 @@ class NoI_CMesh(SimpleTopology):
                                              dst_inport="South",
                                              latency = link_latency,
                                              weight=2))
+                    
+                    print_connection("Router", get_router_id(noc_routers[north_out]),
+                                     "Router", get_router_id(noc_routers[south_in]),
+                                     link_count, link_latency, 512)
+                                                                                                
                     link_count += 1
+                    
+        print("\n\nSouth-North:")                    
         # South output to North input links (weight = 2)
         for col in range(num_columns):
-            for row in range(num_rows):
-                if (row + 1 < num_rows
-                                and not divisible(row+1, num_chiplet_rows)):
-                    north_in = col + (row * num_columns)
-                    south_out = col + ((row + 1) * num_columns)
+            for row in range(num_rows-1,0,-1):
+                if (row - 1 >= 0
+                                and not divisible(row, num_chiplet_rows)):
+                    south_out = col + (row * num_columns)
+                    north_in = col + ((row - 1) * num_columns)
                     int_noc_links.append(IntLink(link_id=link_count,
                                              src_node=noc_routers[south_out],
                                              dst_node=noc_routers[north_in],
@@ -232,11 +277,18 @@ class NoI_CMesh(SimpleTopology):
                                              dst_inport="North",
                                              latency = link_latency,
                                              weight=2))
+                    
+                    print_connection("Router", get_router_id(noc_routers[south_out]),
+                                     "Router", get_router_id(noc_routers[north_in]),
+                                     link_count, link_latency, 512)
+                                                                                           
                     link_count += 1
 
         # Connect network-on-interposer (NoI) internal routers
         int_noi_links = []
+        print("\n\nLink in the 8x8 NoI:")        
 
+        print("\n\nEast-West:")
         # East output to West input links (weight = 1)
         for row in range(num_noi_rows):
             for col in range(num_noi_columns):
@@ -248,15 +300,22 @@ class NoI_CMesh(SimpleTopology):
                                              dst_node=noi_routers[west_in],
                                              src_outport="East",
                                              dst_inport="West",
-                                             latency = link_latency,
+                                             latency = link_latency + 1,
                                              weight=1))
+                    
+                    print_connection("NoI-Router", get_router_id(noi_routers[east_out]),
+                                     "NoI-Router", get_router_id(noi_routers[west_in]),
+                                     link_count, link_latency, 512)
+                                                                                  
                     link_count += 1
+                    
+        print("\n\nWest-East:")                    
         # West output to East input links (weight = 1)
         for row in range(num_noi_rows):
-            for col in range(num_noi_columns):
-                if (col + 1 < num_noi_columns):
-                    east_in = col + (row * num_noi_columns)
-                    west_out = (col + 1) + (row * num_noi_columns)
+            for col in range(num_noi_columns-1,0,-1):
+                if (col - 1  >= 0):
+                    west_out = col + (row * num_noi_columns)
+                    east_in = (col - 1) + (row * num_noi_columns)
                     int_noi_links.append(IntLink(link_id=link_count,
                                              src_node=noi_routers[west_out],
                                              dst_node=noi_routers[east_in],
@@ -264,7 +323,14 @@ class NoI_CMesh(SimpleTopology):
                                              dst_inport="East",
                                              latency = link_latency,
                                              weight=1))
+                    
+                    print_connection("NoI-Router", get_router_id(noi_routers[west_out]),
+                                     "NoI-Router", get_router_id(noi_routers[east_in]),
+                                     link_count, link_latency, 512)
+                                                                                         
                     link_count += 1
+                    
+        print("\n\nNorth-South:")                    
         # North output to South input links (weight = 2)
         for col in range(num_noi_columns):
             for row in range(num_noi_rows):
@@ -276,29 +342,41 @@ class NoI_CMesh(SimpleTopology):
                                              dst_node=noi_routers[south_in],
                                              src_outport="North",
                                              dst_inport="South",
-                                             latency = link_latency,
+                                             latency = link_latency + 1,
                                              weight=2))
+                    
+                    print_connection("NoI-Router", get_router_id(noi_routers[north_out]),
+                                     "NoI-Router", get_router_id(noi_routers[south_in]),
+                                     link_count, link_latency, 512)
+                                                                                         
                     link_count += 1
+                    
+        print("\n\nSouth-North:")                    
         # South output to North input links (weight = 2)
         for col in range(num_noi_columns):
-            for row in range(num_noi_rows):
-                if (row + 1 < num_noi_rows):
-                    north_in = col + (row * num_noi_columns)
-                    south_out = col + ((row + 1) * num_noi_columns)
+            for row in range(num_noi_rows-1,0,-1):
+                if (row - 1 >= 0):
+                    south_out = col + (row * num_noi_columns)
+                    north_in = col + ((row - 1) * num_noi_columns)
                     int_noi_links.append(IntLink(link_id=link_count,
                                              src_node=noi_routers[south_out],
                                              dst_node=noi_routers[north_in],
                                              src_outport="South",
                                              dst_inport="North",
-                                             latency = link_latency,
-                                             weight=2))
+                                             latency = link_latency + 1,
+                                             weight=2))                                            
+                    
+                    print_connection("NoI-Router", get_router_id(noi_routers[south_out]),
+                                     "NoI-Router", get_router_id(noi_routers[north_in]),
+                                     link_count, link_latency, 512)
+                                                                                         
                     link_count += 1
 
         # Connect network-on-chip (NoC) and network-on-interposer (NoI) routers
         int_chiplet_interposer_links = []
         for col in range(num_columns):
             for row in range(num_rows):
-                if (True):
+                if (col % 2 == 0):
                     noc_in = col + (row * num_columns)
                     noi_out = int(col/2) + (int(row/2) * num_noi_columns)
                     int_chiplet_interposer_links.append(
@@ -308,11 +386,37 @@ class NoI_CMesh(SimpleTopology):
                                 src_outport="NoI",
                                 dst_inport="NoC",
                                 latency = link_latency,
-                                weight=3))
+                                weight=2))
+                    
+                    print_connection("NoI-Router", get_router_id(noi_routers[noi_out]),
+                                     "NoC-Router", get_router_id(noc_routers[noc_in]),
+                                     link_count, link_latency, 512)
+                                                                            
                     link_count += 1
+
+                else:
+                    noc_in = col + (row * num_columns)
+                    noi_out = int((col+1)/2) + (int(row/2) * num_noi_columns)
+                    int_chiplet_interposer_links.append(
+                            IntLink(link_id=link_count,
+                                src_node=noi_routers[noi_out],
+                                dst_node=noc_routers[noc_in],
+                                src_outport="NoI",
+                                dst_inport="NoC",
+                                latency = link_latency,
+                                weight=2))
+                               
+
+                    print_connection("NoI-Router", get_router_id(noi_routers[noi_out]),
+                                     "NoC-Router", get_router_id(noc_routers[noc_in]),
+                                     link_count, link_latency, 512)
+
+                    link_count += 1
+
+        print("\n\nNoC-NoI")
         for col in range(num_columns):
             for row in range(num_rows):
-                if (True):
+                if (col % 2 == 0):
                     noc_out = col + (row * num_columns)
                     noi_in = int(col/2) + (int(row/2) * num_noi_columns)
                     int_chiplet_interposer_links.append(
@@ -322,7 +426,30 @@ class NoI_CMesh(SimpleTopology):
                                 src_outport="NoC",
                                 dst_inport="NoI",
                                 latency = link_latency,
-                                weight=3))
+                                weight=2))
+
+                    print_connection("NoC-Router", get_router_id(noc_routers[noc_out]),
+                                     "NoI-Router", get_router_id(noi_routers[noi_in]),
+                                     link_count, link_latency, 512)
+                                                                            
+                    link_count += 1
+
+                else:
+                    noc_out = col + (row * num_columns)
+                    noi_in = int(col/2 + 1) + (int(row/2) * num_noi_columns)
+                    int_chiplet_interposer_links.append(
+                            IntLink(link_id=link_count,
+                                src_node=noc_routers[noc_out],
+                                dst_node=noi_routers[noi_in],
+                                src_outport="NoC",
+                                dst_inport="NoI",
+                                latency = link_latency,
+                                weight=2))
+
+                    print_connection("NoC-Router", get_router_id(noc_routers[noc_out]),
+                                     "NoI-Router", get_router_id(noi_routers[noi_in]),
+                                     link_count, link_latency, 512)
+
                     link_count += 1
 
         network.int_links = (int_noc_links + int_noi_links
@@ -346,3 +473,11 @@ class NoI_CMesh(SimpleTopology):
         for i in range(options.num_cpus):
             FileSystemConfig.register_node([i],
                     MemorySize(options.mem_size) / options.num_cpus, i)
+
+def get_router_id(node) :
+    return str(node).split('.')[3].split('routers')[1]
+
+def print_connection(src_type, src_id, dst_type, dst_id, link_id, lat, bw):
+    print (str(src_type) + "-" + str(src_id) + " connected to " + str(dst_type) + "-" + str(dst_id) + " via Link-" + str(link_id) + \
+          " with latency=" + str(lat) + " (cycles)" \
+          " and bandwidth=" + str(bw) + " (bits)")

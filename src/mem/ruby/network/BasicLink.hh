@@ -83,8 +83,12 @@ class BasicIntLink : public BasicLink
     typedef BasicIntLinkParams Params;
     BasicIntLink(const Params *p);
     const Params *params() const { return (const Params *)_params; }
-
+    
     friend class Topology;
+    
+    /// tuvalu
+    // for printing Intlink's src and dst
+    void srcdstprint();
 };
 
 #endif //__MEM_RUBY_NETWORK_BASICLINK_HH__

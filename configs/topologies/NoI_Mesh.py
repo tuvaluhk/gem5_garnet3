@@ -28,12 +28,15 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
+import m5
+
 from m5.params import *
 from m5.objects import *
 
 from common import FileSystemConfig
 
 from topologies.BaseTopology import SimpleTopology
+from topologies.TopologyToDSENT import TopologyToDSENT
 
 # Creates a generic Mesh assuming an equal number of cache
 # and directory controllers.
@@ -106,36 +109,47 @@ class NoI_Mesh(SimpleTopology):
         link_count = 0
 
         # The remainder_nodes are Dir nodes as the memory controller node
-        network_nodes = []
+        l1_nodes = []
+        dir_nodes = []
         remainder_nodes = []
-        for node_index in range(len(nodes)):
+        for node in nodes:
             #if node_index < num_noc_routers:
-            if node_index < (len(nodes) - remainder):
-                network_nodes.append(nodes[node_index])
+            if node.type == 'L1Cache_Controller':
+                l1_nodes.append(node)  
+            elif node.type == 'Directory_Controller':
+                dir_nodes.append(node)  
             else:
-                remainder_nodes.append(nodes[node_index])
+                remainder_nodes.append(node)
 
         # Connect each node to the appropriate router
         ext_l1cache_links = []
         ext_dir_links = []
-        for (i, n) in enumerate(network_nodes):
-            if (n.type == 'L1Cache_Controller'):
-                cntrl_level, router_id = divmod(i, num_noc_routers)
-                assert(cntrl_level < cntrls_per_router)
-                ext_l1cache_links.append(ExtLink(link_id=link_count,
-                                        ext_node=n,
-                                        int_node=noc_routers[router_id],
-                                        latency = link_latency))
-            elif (n.type == 'Directory_Controller'):
-                #assert(False or num_noc_routers == 4)
-                cntrl_level, router_id = divmod(i, num_noc_routers)
-                assert(cntrl_level < cntrls_per_router)
-                ext_dir_links.append(ExtLink(link_id=link_count,
-                                        ext_node=n,
-                                        int_node=noc_routers[router_id],
-                                        latency = link_latency))
-            else:
-                assert(False)
+        print("\n\nL1Cache-NoC-Router:")
+        for (i, n) in enumerate(l1_nodes):
+            cntrl_level, router_id = divmod(i, num_noc_routers)
+            assert(cntrl_level < cntrls_per_router)
+            ext_l1cache_links.append(ExtLink(link_id=link_count,
+                                     ext_node=n,
+                                     int_node=noc_routers[router_id],
+                                     latency = link_latency))                    
+            link_count += 1
+        
+
+        print("\n\nDir-NoI-Router:")                          
+        for (i, n) in enumerate(dir_nodes):
+            ## Left-Side Directory Controller
+            if(0<=i<8):
+                router_id = i*num_columns 
+                print(router_id)
+            ## Right-Side Directory Controller
+            elif(8<=i<16):
+                router_id = (i - 8)*num_columns + 7
+                print(router_id)
+            ext_dir_links.append(ExtLink(link_id=link_count,
+                                    ext_node=n,
+                                    int_node=noi_routers[router_id],
+                                    latency = link_latency))
+                                    
             link_count += 1
 
         # Connect the 4 remainding nodes to corners.  These should only be
@@ -184,7 +198,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="East",
                                              dst_inport="West",
                                              latency = link_latency,
-                                             weight=1))
+                                             weight=4))
                     link_count += 1
 
         # West output to East input links (weight = 1)
@@ -200,7 +214,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="West",
                                              dst_inport="East",
                                              latency = link_latency,
-                                             weight=1))
+                                             weight=4))
                     link_count += 1
 
         # North output to South input links (weight = 2)
@@ -216,7 +230,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="North",
                                              dst_inport="South",
                                              latency = link_latency,
-                                             weight=2))
+                                             weight=5))
                     link_count += 1
 
         # South output to North input links (weight = 2)
@@ -232,7 +246,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="South",
                                              dst_inport="North",
                                              latency = link_latency,
-                                             weight=2))
+                                             weight=5))
                     link_count += 1
 
         # Connect network-on-interposer (NoI) internal routers
@@ -250,7 +264,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="East",
                                              dst_inport="West",
                                              latency = link_latency,
-                                             weight=1))
+                                             weight=2))
                     link_count += 1
 
         # West output to East input links (weight = 1)
@@ -265,7 +279,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="West",
                                              dst_inport="East",
                                              latency = link_latency,
-                                             weight=1))
+                                             weight=2))
                     link_count += 1
 
         # North output to South input links (weight = 2)
@@ -280,7 +294,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="North",
                                              dst_inport="South",
                                              latency = link_latency,
-                                             weight=2))
+                                             weight=3))
                     link_count += 1
 
         # South output to North input links (weight = 2)
@@ -295,7 +309,7 @@ class NoI_Mesh(SimpleTopology):
                                              src_outport="South",
                                              dst_inport="North",
                                              latency = link_latency,
-                                             weight=2))
+                                             weight=3))
                     link_count += 1
 
         # Connect network-on-chip (NoC) and network-on-interposer (NoI) routers
@@ -312,7 +326,7 @@ class NoI_Mesh(SimpleTopology):
                                 src_outport="NoI",
                                 dst_inport="NoC",
                                 latency = link_latency,
-                                weight=3))
+                                weight=1))
                     link_count += 1
         for col in range(num_columns):
             for row in range(num_rows):
@@ -326,7 +340,7 @@ class NoI_Mesh(SimpleTopology):
                                 src_outport="NoC",
                                 dst_inport="NoI",
                                 latency = link_latency,
-                                weight=3))
+                                weight=1))
                     link_count += 1
 
         network.int_links = (int_noc_links + int_noi_links
@@ -342,9 +356,15 @@ class NoI_Mesh(SimpleTopology):
         assert(len(int_noi_links)
                 == 2*(num_rows*(num_columns-1) + num_columns*(num_rows-1)))
         assert(len(int_chiplet_interposer_links) == 2*options.num_cpus)
-
+                    
+        # Generate router.cfg and electrical-link.cfg for DSENT
+        dsent = TopologyToDSENT(m5.options.outdir, options.link_width_bits, 
+                                options.vcs_per_vnet, options.buffers_per_ctrl_vc,
+                                options.buffers_per_data_vc, max(num_rows, num_columns))          
+                                
+                                
     # Register nodes with filesystem
     def registerTopology(self, options):
         for i in range(options.num_cpus):
             FileSystemConfig.register_node([i],
-                    MemorySize(options.mem_size) / options.num_cpus, i)
+                    MemorySize(options.mem_size) / options.num_cpus, i)                                          

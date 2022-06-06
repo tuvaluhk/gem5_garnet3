@@ -33,6 +33,7 @@
 #define __MEM_RUBY_NETWORK_GARNET2_0_GARNETNETWORK_HH__
 
 #include <iostream>
+#include <map>
 #include <vector>
 
 #include "mem/ruby/network/Network.hh"
@@ -47,6 +48,11 @@ class NetDest;
 class NetworkLink;
 class CreditLink;
 
+//// Updown Routing
+// code begin
+using namespace std;
+// code end
+
 class GarnetNetwork : public Network
 {
   public:
@@ -58,6 +64,23 @@ class GarnetNetwork : public Network
 
     // Configuration (set externally)
 
+
+    /// updown routing
+    void populate_routingTable(\
+                       std::vector<int>& path_, int ylen);
+
+    void configure_network();
+
+    char get_direction(int src, int dst) {
+        upDn_ tmp(src, dst);
+        return (global_upDn.at(tmp));
+    }
+    
+
+    int StringToInt(const char *str);
+    long long StringToIntCore(const char *str,bool minus);
+    /// end
+    
     // for 2D topology
     int getNumRows() const { return m_num_rows; }
     int getNumCols() { return m_num_cols; }
@@ -139,6 +162,48 @@ class GarnetNetwork : public Network
     {
         m_total_hops += hops;
     }
+    
+    /// updown routing
+    std::string conf_file;
+   
+    /// Escape VC
+    uint32_t escape_vc;
+    /// end
+    struct entry {
+     int next_router_id;
+     std::string direction_;
+     entry() :
+         next_router_id(-1),
+         direction_("Unknown")
+    {}
+    entry(int id, std::string dirn) :
+            next_router_id(id),
+            direction_(dirn)
+    {}
+    };
+
+    struct upDn_ {
+        int src;
+        int dst;
+
+        bool operator==(const upDn_ &pair_) const {
+            return (src == pair_.src && dst == pair_.dst);
+        }
+
+        bool operator<(const upDn_ &pair_)  const {
+            return ((src < pair_.src) ||
+                    (src == pair_.src && dst < pair_.dst));
+        }
+
+        upDn_(int src_, int dst_) :
+            src(src_), dst(dst_)
+        {}
+    };
+
+    std::vector<std::vector<std::vector< entry > > > routingTable;
+
+    std::map<upDn_, char> global_upDn;
+   /// end
 
   protected:
     // Configuration

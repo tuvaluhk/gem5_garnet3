@@ -35,6 +35,11 @@
 #include "mem/ruby/network/garnet2.0/Credit.hh"
 #include "mem/ruby/network/garnet2.0/CreditLink.hh"
 #include "mem/ruby/network/garnet2.0/Router.hh"
+//// Updown Routing with Escape_VC
+// code begin
+#include "mem/ruby/network/garnet2.0/InputUnit.hh"
+
+// code end
 #include "mem/ruby/network/garnet2.0/flitBuffer.hh"
 
 OutputUnit::OutputUnit(int id, PortDirection direction, Router *router,
@@ -84,33 +89,184 @@ OutputUnit::has_credit(int out_vc)
 }
 
 
-// Check if the output port (i.e., input port at next router) has free VCs.
-bool
-OutputUnit::has_free_vc(int vnet)
+//// Updown Routing with Escape_VC
+// code begin
+int
+OutputUnit::getNumFreeVCs(int vnet)
 {
+    int freeVC = 0;    
     int vc_base = vnet*m_vc_per_vnet;
     for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
         if (is_vc_idle(vc, curTick()))
-            return true;
+            freeVC++;
+    }
+    return freeVC;
+
+}
+// code end
+
+// Check if the output port (i.e., input port at next router) has free VCs.
+//// Updown Routing with Escape_VC
+// code begin
+bool
+OutputUnit::has_free_vc(int vnet, int invc, flit* t_flit, int inport)
+{
+    if (m_router->get_net_ptr()->escape_vc == 1) {
+        // with escape_vc
+
+        int vc_base = vnet*m_vc_per_vnet;
+        // select last vc of this vnet as escape VC
+        int escapeVC = vc_base + (m_vc_per_vnet - 1);
+
+        // select free vc !!!
+        if (invc == escapeVC) {
+            // if invc is escapeVC
+            ///////////////////////////////////////////////////////////
+            // can't use the assert here as flit might
+            // just injected into 'escapeVC' at source!
+            if (t_flit->get_injection_vc() != escapeVC)
+                assert(t_flit->get_route().new_src != -1);
+            ///////////////////////////////////////////////////////////
+            // if escapeVC is idle, use escapeVC
+            if (is_vc_idle(invc, m_router->curCycle())) {
+                return true;
+            }
+        } else {
+            // if invc not escapeVC
+            if ((t_flit->get_type() == HEAD_) ||
+                (t_flit->get_type() == HEAD_TAIL_)) {
+                // only for 'HEAD_' or 'HEAD_TAIL_' flit
+                // get upDn_outport
+                PortDirection inport_dirn = m_router-> \
+                    getInputUnit(inport)->get_direction();
+                // -------------------------------------------------- //
+                int upDn_outport = m_router->get_routingUnit_ref()-> \
+                    outportCompute(t_flit->get_route(), invc, inport,
+                                inport_dirn, true);
+                if (upDn_outport == m_id) {
+                    // if `upDn_outport` is the same as `this_outport`
+                    // consider escapeVC, select vc from all vc
+                    for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++)
+                    {
+                        if (is_vc_idle(vc, m_router->curCycle())) {
+                            return true;
+                        }
+                    }
+                } else {
+                    // select vc from all vc except escapeVC
+                    for (int vc = vc_base; vc < escapeVC; vc++) {
+                        if (is_vc_idle(vc, m_router->curCycle())) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // without escape_vc: original select_free_vc() function
+        int vc_base = vnet*m_vc_per_vnet;
+        for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
+            if (is_vc_idle(vc, m_router->curCycle())) {
+                // has free vc, return true
+                return true;
+            }
+        }
     }
 
     return false;
 }
+// code end
 
 // Assign a free output VC to the winner of Switch Allocation
+//// Updown Routing with Escape_VC
+// code begin
 int
-OutputUnit::select_free_vc(int vnet)
+OutputUnit::select_free_vc(int vnet, int invc, flit* t_flit, int inport)
 {
-    int vc_base = vnet*m_vc_per_vnet;
-    for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
-        if (is_vc_idle(vc, curTick())) {
-            outVcState[vc].setState(ACTIVE_, curTick());
-            return vc;
+    if (m_router->get_net_ptr()->escape_vc == 1) {
+        // with escape_vc
+
+        int vc_base = vnet*m_vc_per_vnet;
+        // select last vc of this vnet as escape VC
+        int escapeVC = vc_base + (m_vc_per_vnet - 1);
+
+        // select free vc !!!
+        if (invc == escapeVC) {
+            // if invc is escapeVC
+            ///////////////////////////////////////////////////////////
+            // if injection vc not escapeVC, new_src should != -1 ?
+            // what is injection_vc ???
+            // why new_src != -1 ???
+            if (t_flit->get_injection_vc() != escapeVC)
+                assert(t_flit->get_route().new_src != -1);
+            ///////////////////////////////////////////////////////////
+            // if escapeVC is idle, use escapeVC
+            if (is_vc_idle(invc, m_router->curCycle())) {
+                outVcState[invc].setState(ACTIVE_, m_router->curCycle());
+                // -------------------------------------------------- //
+                return invc;
+            }
+        } else {
+            // if invc not escapeVC
+            if ((t_flit->get_type() == HEAD_) ||
+                (t_flit->get_type() == HEAD_TAIL_)) {
+                // only for 'HEAD_' or 'HEAD_TAIL_' flit
+                // get upDn_outport
+                PortDirection inport_dirn = m_router-> \
+                    getInputUnit(inport)->get_direction();
+                // -------------------------------------------------- //
+                int upDn_outport = m_router->get_routingUnit_ref()-> \
+                    outportCompute(t_flit->get_route(), invc, inport,
+                                inport_dirn, true);
+                if (upDn_outport == m_id) {
+                    // if `upDn_outport` is the same as `this_outport`
+                    // consider escapeVC, select vc from all vc
+                    for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++)
+                    {
+                        if (is_vc_idle(vc, m_router->curCycle())) {
+                            outVcState[vc].setState(ACTIVE_,
+                                                    m_router->curCycle());
+                            // ---------------------------------------- //
+                            if (vc == escapeVC) {
+                                // if vc is escapeVC,
+                                // then set this router as the new src
+                                assert(t_flit->get_route().new_src == -1);
+                                t_flit->get_route_ref().new_src = \
+                                    m_router->get_id();
+                            }
+                            return vc;
+                        }
+                    }
+                } else {
+                    // select vc from all vc except escapeVC
+                    for (int vc = vc_base; vc < escapeVC; vc++) {
+                        if (is_vc_idle(vc, m_router->curCycle())) {
+                            outVcState[vc].setState(ACTIVE_,
+                                                    m_router->curCycle());
+                            // ---------------------------------------- //
+                            return vc;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // without escape_vc: original select_free_vc() function
+        int vc_base = vnet*m_vc_per_vnet;
+        for (int vc = vc_base; vc < vc_base + m_vc_per_vnet; vc++) {
+            if (is_vc_idle(vc, m_router->curCycle())) {
+                // set outvc state
+                outVcState[vc].setState(ACTIVE_, m_router->curCycle());
+                // return the first free vc
+                return vc;
+            }
         }
     }
 
     return -1;
 }
+// code end
+
 
 /*
  * The wakeup function of the OutputUnit reads the credit signal from the

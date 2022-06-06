@@ -58,6 +58,11 @@ class flit
     Tick get_time() { return m_time; }
     int get_vnet() { return m_vnet; }
     int get_vc() { return m_vc; }
+    //// Updown Routing with Escape_VC
+    // code begin
+    int get_injection_vc() { return m_injection_vc; }
+    RouteInfo& get_route_ref() { return m_route; }
+    // code end    
     RouteInfo get_route() { return m_route; }
     MsgPtr& get_msg_ptr() { return m_msg_ptr; }
     flit_type get_type() { return m_type; }
@@ -111,6 +116,10 @@ class flit
     int m_id;
     int m_vnet;
     int m_vc;
+    //// Updown Routing with Escape_VC
+    // code begin
+    int m_injection_vc;
+    // code end    
     RouteInfo m_route;
     int m_size;
     Tick m_enqueue_time, m_dequeue_time;
