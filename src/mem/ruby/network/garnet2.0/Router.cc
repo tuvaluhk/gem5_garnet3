@@ -112,8 +112,10 @@ Router::addInPort(PortDirection inport_dirn,
     routingUnit.addInDirection(inport_dirn, port_num);
 }
 
+/// Updown Routing+ code begin
 void
-Router::addOutPort(PortDirection outport_dirn,
+Router::addOutPort(SwitchID dest,
+                   PortDirection outport_dirn,
                    NetworkLink *out_link,
                    std::vector<NetDest>& routing_table_entry, int link_weight,
                    CreditLink *credit_link, uint32_t consumerVcs)
@@ -136,8 +138,9 @@ Router::addOutPort(PortDirection outport_dirn,
 
     routingUnit.addRoute(routing_table_entry);
     routingUnit.addWeight(link_weight);
-    routingUnit.addOutDirection(outport_dirn, port_num);
+    routingUnit.addOutDirection(dest, outport_dirn, port_num);
 }
+/// code end
 
 PortDirection
 Router::getOutportDirection(int outport)

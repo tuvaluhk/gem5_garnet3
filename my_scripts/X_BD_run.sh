@@ -31,19 +31,18 @@
 
 ./build/NULL/gem5.debug \
 -d my_outdir/NoI/ButterDonut_X \
-configs/my/garnet_synth_traffic1.py \
+configs/my/garnet_synth_traffic.py \
 --num-cpus=64 \
 --num-dirs=16 \
 --network=garnet2.0 \
 --topology=NoI_ButterDonut_X \
---escape-vc=1 \
---conf-file=configs/topologies/udrouting/BD_NoI.txt \
+--routing-algorithm=0 \
 --mesh-rows=8 \
 --num-chiplets=4 \
 --sim-cycles=20000 \
 --vcs-per-vnet=4 \
 --inj-vnet=0 \
---injectionrate=0.6 \
+--injectionrate=0.2 \
 --synthetic=uniform_random
 $1
 exit

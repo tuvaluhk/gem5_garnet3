@@ -1,6 +1,0 @@
-Run: Stats:
-sim_ticks                                       20313                       # Number of ticks simulated
-system.ruby.network.average_packet_latency  7532.390625                      
-system.ruby.network.average_hops             2.732231                      
-system.ruby.network.packets_injected::total         1651                      
-system.ruby.network.packets_received::total          384                      

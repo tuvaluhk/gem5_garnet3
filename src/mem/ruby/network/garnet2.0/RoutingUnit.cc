@@ -173,9 +173,10 @@ RoutingUnit::lookupRoutingTable_adaptive(int vnet, NetDest msg_destination)
     }
 
     if (output_link_candidates.size() == 0) {
-        fatal("Fatal Error:: No Route exists from this Router.");
+        fatal("Fatal Error:: lookupRoutingTable_adaptive: No Route exists from this Router.");
         exit(0);
     }
+
 
     // Randomly select any candidate output link
     //int candidate = 0;
@@ -222,12 +223,18 @@ RoutingUnit::addInDirection(PortDirection inport_dirn, int inport_idx)
     m_inports_idx2dirn[inport_idx]  = inport_dirn;
 }
 
+/// Updown Routing+ code begin
 void
-RoutingUnit::addOutDirection(PortDirection outport_dirn, int outport_idx)
+RoutingUnit::addOutDirection(SwitchID dest,\
+PortDirection outport_dirn, int outport_idx)
 {
     m_outports_dirn2idx[outport_dirn] = outport_idx;
     m_outports_idx2dirn[outport_idx]  = outport_dirn;
+    if (outport_dirn != "Local") {
+        m_nxt_router_id2idx[dest] = outport_idx;
+        }
 }
+/// code end
 
 // outportCompute() is called by the InputUnit
 // It calls the routing table by default.
@@ -270,18 +277,31 @@ RoutingUnit::outportCompute(RouteInfo route, int vc, int inport,
                 outportComputeXY(route, inport, inport_dirn); break;
             /// updown routing
             case UPDN_:     outport =
-                outportComputeUPDN(route, inport, inport_dirn); break;     
+                outportComputeUPDN(route, inport, inport_dirn, check_upDn_port); break;     
             /// end        
             // any custom algorithm
             case CUSTOM_: outport =
                 outportComputeCustom(route, inport, inport_dirn); break;
             default: outport =
-                lookupRoutingTable_adaptive(route.vnet, route.net_dest); break;
+                lookupRoutingTable(route.vnet, route.net_dest); break;
         }
-        
-    }else {
+
+    }else if ((routing_algorithm == UPDN_) &&
+                (m_router->get_net_ptr()->escape_vc == 1)){
+        // get vc_base and escapeVC of current vnet
+        int vc_base = route.vnet*m_router->get_vc_per_vnet();
+        int escapeVC = vc_base + (m_router->get_vc_per_vnet() - 1);
+        // if vc is escapeVC, compute outport using UpDown Routing
+        if (vc == escapeVC || check_upDn_port) {
+            outport = outportComputeUPDN(route, inport, inport_dirn, check_upDn_port);
+        } else {
             // else using lookupRoutingTable_adaptive
-        outport = lookupRoutingTable_adaptive(route.vnet, route.net_dest);
+            outport = lookupRoutingTable_adaptive(route.vnet, route.net_dest);
+        }
+
+    } else {
+        std::cout << "Invalid value of 'escape_vc'!" << std::endl;
+        assert(0);
     }
 
     assert(outport != -1);
@@ -352,20 +372,38 @@ RoutingUnit::outportComputeXY(RouteInfo route,
 int
 RoutingUnit::outportComputeUPDN(RouteInfo route,
                     int inport,
-                    PortDirection inport_dirn)
+                    PortDirection inport_dirn,
+                    bool check_upDn_port)
 {
-    PortDirection outport_dirn = "Unknown";
+    //PortDirection outport_dirn = "Unknown";
+    int nxt_router_id = 0;
 
     // get curr_id, dest_id and stc_id
     int curr_id = m_router->get_id();
-    int src_id = route.src_router;
+    int src_id;
     int dest_id = route.dest_router;
+
+    //// Updown Routing with Escape_VC
+    // code begin
+    // get src_id
+    if (check_upDn_port) {
+        src_id = curr_id;
+    } else {
+        if (route.new_src == -1)
+            // if no escapeVC
+            src_id = route.src_router;
+        else
+            // if escapeVC
+            // new_src set in OutputUnit::select_free_vc
+            src_id = route.new_src;
+    }
+    // code end
 
     // if current id is the source id
     if (curr_id == src_id) {
         // this means that it's the beginning
-        outport_dirn = m_router->get_net_ptr()->\
-            routingTable[src_id][dest_id][0].direction_;
+        nxt_router_id = m_router->get_net_ptr()->\
+            routingTable[src_id][dest_id][0].next_router_id;
     } else {
         // for cycle until match the target index:
         for (int indx= 0; indx < m_router->get_net_ptr()->\
@@ -374,20 +412,20 @@ RoutingUnit::outportComputeUPDN(RouteInfo route,
             if (m_router->get_net_ptr()->\
                 routingTable[src_id][dest_id][indx].\
                 next_router_id == curr_id) {
-                outport_dirn = m_router->get_net_ptr()->\
-                    routingTable[src_id][dest_id][indx+1].direction_;
+                nxt_router_id = m_router->get_net_ptr()->\
+                    routingTable[src_id][dest_id][indx+1].next_router_id;
                 break;
             }
         }
     }
 
-    assert(outport_dirn != "Unknown");
+    //assert(outport_dirn != "Unknown");
     //cout << "curr_id: " << curr_id << endl;
     //cout << "dest_id: " << dest_id << endl;
     //cout << "outport_dirn: " << outport_dirn << endl;
     /*cout << "m_outports_dirn2idx[outport_dirn]: " \
     << m_outports_dirn2idx[outport_dirn] << endl;*/
-    return m_outports_dirn2idx[outport_dirn];
+    return m_nxt_router_id2idx[nxt_router_id];
 }
 // code end
 

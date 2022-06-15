@@ -30,30 +30,27 @@
 
 
 ./build/NULL/gem5.debug \
---debug-flags=RubyNetwork --debug-file=uniform_random0.5.txt \
--d my_outdir/NoI/ButterDonut \
-configs/my/garnet_synth_traffic.py \
+-d my_outdir/NoI/CMesh \
+configs/my/garnet_synth_traffic1.py \
 --num-cpus=64 \
 --num-dirs=16 \
---sys-clock=3GHz \
---ruby-clock=3GHz \
 --network=garnet2.0 \
---topology=NoI_ButterDonut \
+--routing-algorithm=2 \
+--conf-file=configs/topologies/udrouting/NoI.txt \
+--topology=NoI_CMesh \
 --mesh-rows=8 \
 --num-chiplets=4 \
 --sim-cycles=20000 \
 --vcs-per-vnet=4 \
 --inj-vnet=0 \
---injectionrate=0.5 \
+--injectionrate=0.24 \
 --synthetic=uniform_random
 $1
-
+exit
 
 # Print Stats
 echo
 echo "Run: Stats:"
-grep "sim_ticks" my_outdir/NoI/ButterDonut/stats.txt
-grep "average_packet_latency" my_outdir/NoI/ButterDonut/stats.txt
-grep "average_hops" my_outdir/NoI/ButterDonut/stats.txt
-grep "packets_injected::total" my_outdir/NoI/ButterDonut/stats.txt
-grep "packets_received::total" my_outdir/NoI/ButterDonut/stats.txt
+grep "sim_ticks" my_outdir/NoI/CMesh/stats.txt
+grep "average_packet_latency" my_outdir/NoI/CMesh/stats.txt
+grep "average_hops" my_outdir/NoI/CMesh/stats.txt

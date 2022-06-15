@@ -84,6 +84,10 @@ parser.add_option("--inj-vnet", type="int", default=-1,
                         0 and 1 are 1-flit, 2 is 5-flit.\
                         Set to -1 to inject randomly in all vnets.")
 
+# By YenHao
+parser.add_option("--num-chiplets", type="int", default=4,
+                help="number of chiplets on the system, added by YenHao")
+
 #
 # Add the ruby specific and protocol specific options
 #

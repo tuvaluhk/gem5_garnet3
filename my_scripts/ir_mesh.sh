@@ -5,6 +5,7 @@
 --topology=irregular_Mesh_XY \
 --conf-file=configs/topologies/udrouting/16_nodes-connectivity_matrix_0-links_removed_8.txt \
 --routing-algorithm=2 \
+--escape-vc=1 \
 --mesh-rows=4  \
 --sim-cycles=100000 \
 --inj-vnet=0 \

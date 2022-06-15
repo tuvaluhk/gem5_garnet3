@@ -105,7 +105,7 @@ GarnetNetwork::GarnetNetwork(const Params *p)
     
     /// updown routing
     // resize the routingTable
-    routingTable.resize(m_routers.size());
+    //routingTable.resize(m_routers.size());
     //configure_network();
     /// end
 }
@@ -243,7 +243,7 @@ GarnetNetwork::configure_network()
     inFile >> word;
     int ylen = stoi(word);
 
-    assert(m_num_rows == xlen);
+    // assert(m_num_rows == xlen);
     // assert(m_routers.size() == xlen*ylen);
 
     // resize the table
@@ -314,8 +314,8 @@ GarnetNetwork::configure_network()
             }
             if (path_start &&
                 !path_end) {
-                cout << stoi(word);
-                cout << " ";
+                //cout << stoi(word);
+                //cout << " ";
                 tmp_path.push_back(stoi(word));
             }
             if (word == ":") {
@@ -539,18 +539,22 @@ GarnetNetwork::makeExtOutLink(SwitchID src, NodeID global_dest,
     if (garnet_link->intBridgeEn) {
         DPRINTF(RubyNetwork, "Enable internal bridge for %s\n",
             garnet_link->name());
+        /// Updown Routing+: code begin
         m_routers[src]->
-            addOutPort(src_outport_dirn,
+            addOutPort(global_dest,src_outport_dirn,
                        garnet_link->intNetBridge[LinkDirection_Out],
                        routing_table_entry, link->m_weight,
                        garnet_link->intCredBridge[LinkDirection_Out],
                        m_routers[src]->get_vc_per_vnet());
+        /// code end
     } else {
+        /// Updown Routing+: code begin
         m_routers[src]->
-            addOutPort(src_outport_dirn, net_link,
+            addOutPort(global_dest, src_outport_dirn, net_link,
                        routing_table_entry,
                        link->m_weight, credit_link,
                        m_routers[src]->get_vc_per_vnet());
+        /// code end
     }
 }
 
@@ -591,16 +595,20 @@ GarnetNetwork::makeInternalLink(SwitchID src, SwitchID dest, BasicLink* link,
     if (garnet_link->srcBridgeEn) {
         DPRINTF(RubyNetwork, "Enable source bridge for %s\n",
             garnet_link->name());
+        /// Updown Routing+ : code begin
         m_routers[src]->
-            addOutPort(src_outport_dirn, garnet_link->srcNetBridge,
+            addOutPort(dest, src_outport_dirn, garnet_link->srcNetBridge,
                        routing_table_entry,
                        link->m_weight, garnet_link->srcCredBridge,
                        m_routers[dest]->get_vc_per_vnet());
+        /// code end
     } else {
-        m_routers[src]->addOutPort(src_outport_dirn, net_link,
+        /// Updown Routing+ : code begin
+        m_routers[src]->addOutPort(dest, src_outport_dirn, net_link,
                         routing_table_entry,
                         link->m_weight, credit_link,
                         m_routers[dest]->get_vc_per_vnet());
+        /// code end
     }
 }
 
