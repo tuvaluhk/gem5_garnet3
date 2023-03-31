@@ -30,10 +30,11 @@ from __future__ import absolute_import
 
 from m5.params import *
 from m5.objects import *
-
+import m5
 from common import FileSystemConfig
 
 from topologies.BaseTopology import SimpleTopology
+from topologies.TopologyToDSENT import TopologyToDSENT
 
 # Creates a generic Mesh assuming an equal number of cache
 # and directory controllers.
@@ -452,7 +453,7 @@ class NoI_FoldedTorus(SimpleTopology):
             for row in range(num_rows):
                 if (True):
                     noc_in = col + (row * num_columns)
-                    noi_out = int(col/2) + (int(row/2) * num_noi_columns)
+                    noi_out = int(col/2 + 1) + (int(row/2) * num_noi_columns)
                     int_chiplet_interposer_links.append(
                             IntLink(link_id=link_count,
                                 src_node=noi_routers[noi_out],
@@ -473,7 +474,7 @@ class NoI_FoldedTorus(SimpleTopology):
             for row in range(num_rows):
                 if (True):
                     noc_out = col + (row * num_columns)
-                    noi_in = int(col/2) + (int(row/2) * num_noi_columns)
+                    noi_in = int(col/2 + 1) + (int(row/2) * num_noi_columns)
                     int_chiplet_interposer_links.append(
                             IntLink(link_id=link_count,
                                 src_node=noc_routers[noc_out],
@@ -504,6 +505,11 @@ class NoI_FoldedTorus(SimpleTopology):
                 == 2*(2*num_noi_rows*(num_noi_columns)))
           
         assert(len(int_chiplet_interposer_links) == 2*options.num_cpus)
+
+        # Generate router.cfg and electrical-link.cfg for DSENT
+        dsent = TopologyToDSENT(m5.options.outdir, options.link_width_bits, 
+                                options.vcs_per_vnet, options.buffers_per_ctrl_vc,
+                                options.buffers_per_data_vc, max(num_rows, num_columns))     
         
 
     # Register nodes with filesystem

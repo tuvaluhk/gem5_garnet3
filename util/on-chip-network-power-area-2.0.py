@@ -34,6 +34,7 @@ from ConfigParser import ConfigParser
 from collections import Counter
 from math import sqrt
 
+import pdb
 # Compile DSENT to generate the Python module and then import it.
 # This script assumes it is executed from the gem5 root.
 print("Attempting compilation")
@@ -213,7 +214,7 @@ def computeIntLinkPower(num_cycles, int_wire_length, wire_delay_scale, int_links
     results = []
     injrate = getStatsForString(stats_file, "system.ruby.network.int_link_utilization")\
                                 / float(num_cycles) / len(int_links)
-
+    totalwirelength = []
     assert(injrate > 0.0)
 
     for (i, link) in enumerate(int_links):
@@ -247,6 +248,13 @@ def computeIntLinkPower(num_cycles, int_wire_length, wire_delay_scale, int_links
 
         dsent_out = dsent.computeLinkPower(frequency)
         results.append(dict(dsent_out))
+
+        
+        if(i > 192):
+            totalwirelength.append(wire_length * 1000)
+
+        if(int_links.index(link)==len(int_links) - 1):
+            print("total links length: %f mm" % (sum(totalwirelength) - 12800*wire_length))
 
         print("%s.network_link wire length: %f mm" % (link, wire_length * 1000))
 
@@ -401,7 +409,8 @@ def computeRouterPowerAndArea(routers, stats_file, config, router_config_file,
     num_keys = 15
     sum_strings = [""] * num_keys
     avg_strings = [""] * num_keys
-
+    print("\nTotal router number is: %f", len(routers))
+    #pdb.set_trace()
     for router in routers:
         frequency = getClock(router, config)
 
@@ -414,6 +423,7 @@ def computeRouterPowerAndArea(routers, stats_file, config, router_config_file,
                 int_nports += 1
             if config.get(int_link, "dst_node") == router:
                 int_nports += 1
+                
 
         # Count number of ports to ext_links for this router
         ext_nports = 0
@@ -422,6 +432,22 @@ def computeRouterPowerAndArea(routers, stats_file, config, router_config_file,
 
                 # ext_links are defined bidirectionally
                 ext_nports += 2
+
+        # if routers.index(router) > 63:  
+        #     int_nports -= 2  
+        #     ext_nports += 2
+        
+        if routers.index(router) > 63:
+            if(ext_nports == 0):
+                ext_nports += 8
+                int_nports -= 8
+            else: 
+                if(int_nports - ext_nports >= 4 ):
+                    ext_nports += 4
+                    int_nports -= 4
+
+        
+
 
         # All ports are bidirectional
         nports = int_nports + ext_nports
@@ -535,7 +561,7 @@ def computeRouterPowerAndArea(routers, stats_file, config, router_config_file,
 
     # Print sum totals and CPU die area
     print("\nSum totals for all %d routers:" % len(routers))
-    print("\n".join(sum_strings))
+    print("\ntuvalu".join(sum_strings))
     
     print("\nDie area model scaled in proportion to a {0}:".format(model_name))
     print("\twhich amounts to:")
@@ -603,8 +629,9 @@ def parseStats(stats_file, config, router_config_file, link_config_file,
             router_leakage = v
 
     print("\nSum power for all routers + links:")
-    print("    Dynamic power: %f" % (router_dynamic + link_dynamic))
+    print("    All Dynamic power: %f" % (router_dynamic + link_dynamic))
     print("    Leakage power: %f" % (router_leakage + link_leakage))
+    print("    All power: %f" % (router_dynamic + router_leakage + link_dynamic + link_leakage))
 
 # This script parses the config.ini and the stats.txt from a run and
 # generates the power and the area of the on-chip network using DSENT
@@ -627,7 +654,7 @@ def main():
     (config, number_of_virtual_networks, vcs_per_vnet, buffers_per_data_vc,
      buffers_per_control_vc, ni_flit_size_bits, num_cpus,
      routers, int_links, ext_links) = parseConfig(cfg_str)
-
+    
     router_cfg = os.path.join(sys.argv[1], "router.cfg")
     link_cfg = os.path.join(sys.argv[1], "electrical-link.cfg")
 

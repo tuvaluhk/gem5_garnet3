@@ -30,7 +30,6 @@
 
 
 ./build/NULL/gem5.debug \
---debug-flags=NetworkTrace --debug-file=networktrace.txt \
 -d my_outdir/NoI/CMesh \
 configs/my/garnet_synth_traffic1.py \
 --num-cpus=64 \

@@ -29,13 +29,14 @@ from __future__ import print_function
 from __future__ import absolute_import
 import csv
 
-
+import m5
 from m5.params import *
 from m5.objects import *
 
 from common import FileSystemConfig
 
 from topologies.BaseTopology import SimpleTopology
+from topologies.TopologyToDSENT import TopologyToDSENT
 
 # Creates a generic Mesh assuming an equal number of cache
 # and directory controllers.
@@ -600,6 +601,11 @@ class NoI_FoldedTorus_X(SimpleTopology):
                 == 2*(2*num_noi_rows*(num_noi_columns)))
           
         assert(len(int_chiplet_interposer_links) == 2*options.num_cpus)
+
+        # Generate router.cfg and electrical-link.cfg for DSENT
+        dsent = TopologyToDSENT(m5.options.outdir, options.link_width_bits, 
+                                options.vcs_per_vnet, options.buffers_per_ctrl_vc,
+                                options.buffers_per_data_vc, max(num_rows, num_columns))     
         
 
     # Register nodes with filesystem

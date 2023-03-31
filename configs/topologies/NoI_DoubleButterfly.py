@@ -28,12 +28,14 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
+import m5
 from m5.params import *
 from m5.objects import *
 
 from common import FileSystemConfig
 
 from topologies.BaseTopology import SimpleTopology
+from topologies.TopologyToDSENT import TopologyToDSENT
 
 # Creates a generic Mesh assuming an equal number of cache
 # and directory controllers.
@@ -476,6 +478,7 @@ class NoI_DoubleButterfly(SimpleTopology):
         print("\n\nNoI-NoC Links:")
         
         # Connect network-on-chip (NoC) and network-on-interposer (NoI) routers
+        print("\n\nNoI-NoC")
         int_chiplet_interposer_links = []
         for col in range(num_columns):
             for row in range(num_rows):
@@ -496,6 +499,8 @@ class NoI_DoubleButterfly(SimpleTopology):
                                      link_count, link_latency, 512)
 
                     link_count += 1
+
+        print("\n\nNoC-NoI")              
         for col in range(num_columns):
             for row in range(num_rows):
                 if (True):
@@ -532,6 +537,11 @@ class NoI_DoubleButterfly(SimpleTopology):
         assert(len(int_noi_links)
                 == 2*(2*num_noi_rows*(num_noi_columns-1)))
         assert(len(int_chiplet_interposer_links) == 2*options.num_cpus)
+
+        # Generate router.cfg and electrical-link.cfg for DSENT
+        dsent = TopologyToDSENT(m5.options.outdir, options.link_width_bits, 
+                                options.vcs_per_vnet, options.buffers_per_ctrl_vc,
+                                options.buffers_per_data_vc, max(num_rows, num_columns))     
 
     # Register nodes with filesystem
     def registerTopology(self, options):

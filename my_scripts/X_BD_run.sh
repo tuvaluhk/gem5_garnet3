@@ -30,6 +30,8 @@
 
 
 ./build/NULL/gem5.debug \
+--debug-flags=ProtocolTrace \
+--debug-file=standalone \
 -d my_outdir/NoI/ButterDonut_X \
 configs/my/garnet_synth_traffic.py \
 --num-cpus=64 \

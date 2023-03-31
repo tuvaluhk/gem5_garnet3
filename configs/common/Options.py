@@ -90,9 +90,10 @@ def addNoISAOptions(parser):
                       help = """Top-level voltage for blocks running at system
                       power supply""")
     parser.add_option("--sys-clock", action="store", type="string",
-                      default='1GHz',
+                      default='4GHz',
                       help = """Top-level clock for blocks running at system
                       speed""")
+
 
     # Memory Options
     parser.add_option("--list-mem-types",

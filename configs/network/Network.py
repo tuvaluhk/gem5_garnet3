@@ -58,7 +58,28 @@ def define_options(parser):
     parser.add_option("--link-width-bits", action="store", type="int",
                       default=128,
                       help="width in bits for all links inside garnet.")
-                      
+
+    # Clock_domain Options
+    parser.add_option("--cpu-clock", 
+                      default='2GHz',type="string",
+                      help = """Top-level clock for blocks running at system
+                      speed""")
+
+    parser.add_option("--mem-clock", type="string",
+                      default='3GHz',
+                      help = """Top-level clock for blocks running at system
+                      speed""")
+
+    parser.add_option("--noi-clock", type="string",
+                      default='4GHz',
+                      help = """Top-level clock for blocks running at system
+                      speed""")
+
+    ### SerDes module parser
+    parser.add_option("--noi-width", type="int",
+                      default=32,
+                      help="width in bits for all links inside garnet.")
+                          
     ### dsent .cfg parser
     parser.add_option("--buffers-per-data-vc", action="store", type="int", default=4,
                       help="""number of buffers per data virtual channel.""")
